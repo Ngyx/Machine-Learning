@@ -1,0 +1,69 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Yixiang Ng"
+date: "23/06/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(caret)
+library(randomForest)
+setwd("~/Desktop/Pratical Machine Learning")
+```
+
+## Introduction
+
+This is a write-up for the "Practical Machine Learning" course by John Hopkins University on Coursera. The dataset being used is from research on Human Activity Recognition (HAR). In general, data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants were recorded while the participants were asked to do 5 different activitiy classes (sitting-down, standing up, standing, walking and sitting). The objective of this exercise is to predict the correct class based on the accelerometer data.
+
+## Preparing data
+
+The data was downloaded into my working directory. Two datasets, training and validation, were generated. The training dataset contained 19622 observations with 160 columns. A quick look at the dataset showed that many columns had incomplete or NA data.
+
+``` {r preparation}
+training<-read.csv("pml-training.csv")
+validation<-read.csv("pml-testing.csv")
+dim(training)
+head(training)[10:20]
+```
+
+To identify columns with little information, I created a loop function to identify the number of NA or empty observations per column. The results showed me that there were 100 columns which had too little data (19622-19216=406) to give any meaningful information for the prediction. 
+
+```{r loop function}
+temp<-c()
+for (i in 1:ncol(training)){
+  x<-which(is.na(training[,i])|training[,i]=="")
+  temp<-c(temp,length(x))
+}
+temp
+table(temp)
+```
+
+I removed the unwanted columns from the training dataset, as well as the columns containing the row numbers and time stamps, and further partitioned it into a buildData dataset and testData dataset. The columns containing the timestamps and the row numbers were removed since, theoretically, they should not give any information on the activity class.
+
+```{r final dataset}
+removeCol<-which(temp==19216);rm(temp)
+training.cleaned<-training[,-removeCol]
+training.cleaned<-training.cleaned[,-c(1,3:5)]
+
+inBuild<-createDataPartition(training.cleaned$classe,p=0.7,list=FALSE)
+buildData<-training.cleaned[inBuild,]
+testData<-training.cleaned[-inBuild,]
+```
+
+## Prediction Model
+
+Since the activity class was a 5-level categorical variable, I used a 5 fold cross validation random forest model as my prediction model with the buildData dataset. In summary, the training dataset was split into 5 groups and one group is left out in turn with the algorithm running through the remaining 4 groups. The 5 resultant estimates are algamated to build the final model. The model was used to predict the 'classe' variable in the testData dataset, and had an accuracy of 99.9%, or an out of sample error of 0.1%.
+
+``` {r prediction model}
+modFit1<-train(classe~.,method='rf',trControl=trainControl(method='cv',number=5),data=buildData)
+pred<-predict(modFit1,newdata=testData)
+confusionMatrix(pred,testData$classe)
+```
+
+## Final Results
+Finally, I used my model to predict the results of the data for the quiz and got a score of 100%.
+
+``` {r final}
+predict(modFit1,newdata=validation)
+```
+
